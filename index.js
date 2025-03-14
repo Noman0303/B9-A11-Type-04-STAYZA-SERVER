@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
@@ -28,7 +29,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server (optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
         console.log('connected to mongodb')
 
 
@@ -49,12 +50,12 @@ async function run() {
 
                 if (minPrice && maxPrice) {
                     query.price = {
-                        $gte: Number(minPrice), $lte: Number(maxPrice),}
+                        $gte: Number(minPrice), $lte: Number(maxPrice),
+                    }
                 }
 
                 // Apply sorting if provided
-                const sortOptions = sort?{ price: sort === 'desc' ? -1 : 1 } : {};
-
+                const sortOptions = sort ? { price: sort === 'desc' ? -1 : 1 } : {};
 
                 // Fetch rooms from DB with filtering and sorting
                 const rooms = await roomCollection.find(query).sort(sortOptions).toArray();
@@ -63,14 +64,14 @@ async function run() {
                 res.status(200).json(rooms)
 
             }
-            
+
             catch (error) {
                 console.error('Error fetching rooms:', error);
                 res.status(500).json({ message: "Server Error", error });
             }
         })
 
-        // Inidividual Room Details read/get in backend server
+        // Inidividual Room Details read/get in backend server against mail
         app.get('/roomDetails/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
@@ -79,34 +80,20 @@ async function run() {
             // console.log(result)
         })
 
+        // Inidividual booked Room read/get in backend server
 
-        // Updating "availability" in the rooms database whole booked or cancelled the booking
-
-        app.patch('/rooms/:id', async (req, res) => {
+        app.get('/bookedRooms/:id', async (req, res) => {
             const id = req.params.id;
-            const { availability } = req.body;
             const query = { _id: new ObjectId(id) };
-            const updateDoc = {
-                $set: {
-                    availability: availability,
-                },
-            };
-            const result = await roomCollection.updateOne(query, updateDoc);
+            const result = await bookedRoomsCollection.findOne(query);
             res.send(result);
-        });
-
-        // create roomdata with id, mail & booking date in new (bookRoom) database
-
-        app.post('/bookedRooms', async (req, res) => {
-            const bookingData = req.body;
-            const result = await bookedRoomsCollection.insertOne(bookingData);
-            res.send(result);
+            // console.log(result)
         })
 
 
-        // my room data get in the backend Server against email
+        //  read all booked Rooms Details read/get in backend server by mail
 
-        app.get(`/bookedRooms/:email`, async (req, res) => {
+        app.get(`/bookedRoomsbyEmail/:email`, async (req, res) => {
             const email = req.params.email;
             console.log('email received', email)
             // Query to find all bookings with the provided user email
@@ -118,8 +105,73 @@ async function run() {
         })
 
 
+        // update booking date in bookedRoom with review
+
+        app.patch('/bookedRooms/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const { bookingDate, review } = req.body;
+
+            let updatedDoc = {};
+
+            if (bookingDate) {
+                updatedDoc.$set = { bookingDate };
+            }
+
+            if (review) {
+                updatedDoc.$push = { review };
+            }
+
+            if (!Object.keys(updatedDoc).length) {
+                return res.status(400).json({ message: "No valid update data provided." });
+            }
+
+            // Update booking info in bookedRooms
+            const result = await bookedRoomsCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        })
+
+        // In your rooms API route
+        app.patch('/rooms', async (req, res) => {
+            const { name } = req.query;  // Get the room name from query params
+            const { rating, comment, userName } = req.body;
+
+            try {
+                const room = await roomCollection.findOne({ name: name }); // Find the room by name
+                if (!room) {
+                    return res.status(404).send('Room not found');
+                }
+
+                // Update the room's review data (you might want to store reviews differently)
+                room.reviews.push({ rating, comment, userName });
+
+                await room.save();
+                res.json(room);
+            } catch (error) {
+                res.status(500).send('Error updating room review');
+            }
+        });
+
+
+        // Create booking data in bookedRooms collection
+
+        app.post('/bookedRooms', async (req, res) => {
+            const bookingData = req.body;
+            const result = await bookedRoomsCollection.insertOne(bookingData);
+            res.send(result);
+        })
+
+        // Delete booked Room 
+        app.delete('/bookedRooms/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await bookedRoomsCollection.deleteOne(query);
+            res.send(result);
+        })
+
+
         // Send a ping to confirm a successful connection
-        await client.db('admin').command({ ping: 1 });
+        // await client.db('admin').command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
