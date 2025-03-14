@@ -110,48 +110,33 @@ async function run() {
         app.patch('/bookedRooms/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
-            const { bookingDate, review } = req.body;
+            const bookingDate = req.body;
+            console.log(bookingDate)
 
-            let updatedDoc = {};
-
-            if (bookingDate) {
-                updatedDoc.$set = { bookingDate };
+            const updatedDoc = {
+                $set: {
+                    bookingDate: bookingDate
+                },
             }
-
-            if (review) {
-                updatedDoc.$push = { review };
-            }
-
-            if (!Object.keys(updatedDoc).length) {
-                return res.status(400).json({ message: "No valid update data provided." });
-            }
-
-            // Update booking info in bookedRooms
             const result = await bookedRoomsCollection.updateOne(query, updatedDoc);
             res.send(result);
         })
 
-        // In your rooms API route
-        app.patch('/rooms', async (req, res) => {
-            const { name } = req.query;  // Get the room name from query params
+        // Update rooms review by room name
+
+        app.patch('/rooms/:roomName', async (req, res) => {
+           
+            const roomName = req.params.roomName;
+            const query = { roomName : roomName };
             const { rating, comment, userName } = req.body;
-
-            try {
-                const room = await roomCollection.findOne({ name: name }); // Find the room by name
-                if (!room) {
-                    return res.status(404).send('Room not found');
-                }
-
-                // Update the room's review data (you might want to store reviews differently)
-                room.reviews.push({ rating, comment, userName });
-
-                await room.save();
-                res.json(room);
-            } catch (error) {
-                res.status(500).send('Error updating room review');
+            const updatedDoc = {
+                $push: {
+                    reviews:{userName,rating,comment}
+                },
             }
+            const result = await roomCollection.updateOne(query, updatedDoc);
+            res.send(result);            
         });
-
 
         // Create booking data in bookedRooms collection
 
