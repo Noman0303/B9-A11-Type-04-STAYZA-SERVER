@@ -10,9 +10,13 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
+
+
+
 // middleware 
 app.use(express.json());
 app.use(cors());
+
 
 // importing mongoClient from mongodb
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fguqs.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -29,7 +33,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server (optional starting in v4.7)
-        // await client.connect();
+        
         console.log('connected to mongodb')
 
 
@@ -91,6 +95,16 @@ async function run() {
             // console.log(result)
         })
 
+        // Inidividual booked Room read/get in backend server
+
+        app.get('/rooms/:roomName', async (req, res) => {
+            const roomName = req.params.roomName;
+            const query = { room_name: roomName };
+            const result = await roomCollection.findOne(query);
+            res.send(result);
+            // console.log(result)
+        })
+
 
         //  read all booked Rooms Details read/get in backend server by mail
 
@@ -106,34 +120,43 @@ async function run() {
         })
 
 
-        //  Update room availability by ID
+        //  Update room availability by ID 
         app.patch('/roomDetails/:id', async (req, res) => {
-            const id = req.params.id;
+            const _id = req.params.id;
             const { availability } = req.body;
             try {
-                const query = { _id: new ObjectId(id) };
+                const query = { _id: new ObjectId(_id) };
                 console.log("Updating Room Query:", query);
 
                 const update = { $set: { availability } };
                 const result = await roomCollection.updateOne(query, update);
-                
-                if (result.modifiedCount > 0) {
-                    res.json({ success: true, message: "Room availability updated successfully!" });
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).json({ success: false, message: "Room not found!" });
                 }
-                else {
-                    res.status(400).json({ success: false, message: "Room update failed!" });
+
+                if (result.modifiedCount === 0) {
+                    res.json({ success: false, message: "No changes were made. The availability is already set to this value." });
                 }
-                res.json({ message: "Room availability updated successfully" });
+
             }
             catch (error) {
                 console.error("Error updating room:", error);
-                res.status(500).json({ message: "Server error", error });
+                res.status(500).json({ success: false, message: "Server error", error });
             }
+        });
 
+        // Create booking data in bookedRooms collection
 
-
-
-
+        app.post('/bookedRooms', async (req, res) => {
+            const bookingData = req.body;
+            console.log("Received booking data:", bookingData);
+            const result = await bookedRoomsCollection.insertOne(bookingData);
+            if (result.insertedId) {
+                return res.json({ success: true, message: "Booking saved successfully!", insertedId: result.insertedId });
+            } else {
+                res.status(400).json({ success: false, message: "Booking insertion failed!" });
+            }
         });
 
         // update booking date in bookedRoom with review
@@ -141,7 +164,7 @@ async function run() {
         app.patch('/bookedRooms/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
-            const bookingDate = req.body;
+            const bookingDate = req.body.bookingData;
             console.log(bookingDate)
 
             const updatedDoc = {
@@ -171,20 +194,6 @@ async function run() {
             const result = await roomCollection.updateOne(query, updatedDoc);
             res.send(result);
         });
-
-        // Create booking data in bookedRooms collection
-
-        app.post('/bookedRooms', async (req, res) => {
-            const bookingData = req.body;
-            console.log("Received booking data:", bookingData);
-            const result = await bookedRoomsCollection.insertOne(bookingData);
-            if (result.insertedId) {
-                res.json({ success: true, message: "Booking saved successfully!", insertedId: result.insertedId });
-            } else {
-                res.status(400).json({ success: false, message: "Booking insertion failed!" });
-            }
-            res.send(result);
-        })
 
         // Delete booked Room 
         app.delete('/bookedRooms/:id', async (req, res) => {
