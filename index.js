@@ -71,6 +71,7 @@ async function run() {
             }
         })
 
+
         // Inidividual Room Details read/get in backend server against mail
         app.get('/roomDetails/:id', async (req, res) => {
             const id = req.params.id;
@@ -105,6 +106,36 @@ async function run() {
         })
 
 
+        //  Update room availability by ID
+        app.patch('/roomDetails/:id', async (req, res) => {
+            const id = req.params.id;
+            const { availability } = req.body;
+            try {
+                const query = { _id: new ObjectId(id) };
+                console.log("Updating Room Query:", query);
+
+                const update = { $set: { availability } };
+                const result = await roomCollection.updateOne(query, update);
+                
+                if (result.modifiedCount > 0) {
+                    res.json({ success: true, message: "Room availability updated successfully!" });
+                }
+                else {
+                    res.status(400).json({ success: false, message: "Room update failed!" });
+                }
+                res.json({ message: "Room availability updated successfully" });
+            }
+            catch (error) {
+                console.error("Error updating room:", error);
+                res.status(500).json({ message: "Server error", error });
+            }
+
+
+
+
+
+        });
+
         // update booking date in bookedRoom with review
 
         app.patch('/bookedRooms/:id', async (req, res) => {
@@ -125,24 +156,33 @@ async function run() {
         // Update rooms review by room name
 
         app.patch('/rooms/:roomName', async (req, res) => {
-           
+
             const roomName = req.params.roomName;
-            const query = { roomName : roomName };
+            const query = { room_name: roomName };
             const { rating, comment, userName } = req.body;
             const updatedDoc = {
+                // $set: {
+                //     reviews: { $ifNull: ["$reviews", []] }
+                // },
                 $push: {
-                    reviews:{userName,rating,comment}
+                    reviews: { userName, rating, comment }
                 },
             }
             const result = await roomCollection.updateOne(query, updatedDoc);
-            res.send(result);            
+            res.send(result);
         });
 
         // Create booking data in bookedRooms collection
 
         app.post('/bookedRooms', async (req, res) => {
             const bookingData = req.body;
+            console.log("Received booking data:", bookingData);
             const result = await bookedRoomsCollection.insertOne(bookingData);
+            if (result.insertedId) {
+                res.json({ success: true, message: "Booking saved successfully!", insertedId: result.insertedId });
+            } else {
+                res.status(400).json({ success: false, message: "Booking insertion failed!" });
+            }
             res.send(result);
         })
 
