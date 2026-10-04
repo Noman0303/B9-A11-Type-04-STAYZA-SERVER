@@ -1,3 +1,7 @@
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
+
 // import express
 
 const express = require('express');
@@ -9,8 +13,6 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
 const port = process.env.PORT || 5000;
-
-
 
 
 // middleware 
@@ -33,9 +35,11 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server (optional starting in v4.7)
-        
-        console.log('connected to mongodb')
 
+        // Connect the client to the server
+        await client.connect(); // <-- Add this line here!
+
+        console.log('connected to mongodb')
 
         const roomCollection = client.db('Stayza').collection('rooms');
         const bookedRoomsCollection = client.db('Stayza').collection('bookedRooms');
@@ -54,8 +58,9 @@ async function run() {
 
                 if (minPrice && maxPrice) {
                     query.price = {
-                        $gte: Number(minPrice), $lte: Number(maxPrice),
-                    }
+                        $gte: Number(minPrice),
+                        $lte: Number(maxPrice),
+                    };
                 }
 
                 // Apply sorting if provided
@@ -207,10 +212,21 @@ async function run() {
         // Send a ping to confirm a successful connection
         // await client.db('admin').command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-        // Ensures that the client will close when you finish/error
-        // await client.close();
-    };
+
+
+        //  To listen from server on the declared port
+        app.listen(port, () => {
+            console.log(`Stayza server is running on port ${port}`)
+        });
+
+    } 
+    catch (error) {
+        console.error("MongoDB connection error:", error);
+    }
+    // finally {
+    //     // Ensures that the client will close when you finish/error
+    //     // await client.close();
+    // };
 }
 
 run().catch(console.dir);
@@ -221,10 +237,6 @@ app.get('/', (req, res) => {
 });
 
 
-//  To listen from server on the declared port
-app.listen(port, () => {
-    console.log(`Stayza server is running on port ${port}`)
-})
 
 
 
